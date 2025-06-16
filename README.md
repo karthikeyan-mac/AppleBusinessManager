@@ -12,7 +12,7 @@ To run this script, you will need to generate the following credentials from the
 - **Client ID** & **Team ID**: These can be the same for your account.
 - **Key ID**: A unique identifier for the key used in the ABM/ASM portal.
 
-For detailed instructions on how to generate these credentials, refer to the [Apple Support Guide for Apple School Manager](https://support.apple.com/en-ca/guide/apple-school-manager/axm33189f66a/1/web/1).
+For detailed instructions on how to generate these credentials, refer to the [Apple Support Guide for Apple School Manager](https://support.apple.com/en-ca/guide/apple-school-manager/axm33189f66a/1/web/1) and [Apple Support Guide for Apple Business Manager](https://support.apple.com/en-ca/guide/apple-business-manager/axm33189f66a/1/web/1)
 
 ## Script Features
 
