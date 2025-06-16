@@ -1,31 +1,17 @@
 #!/usr/bin/python3
-"""
-Script: fetch_assigned_servers.py
-Purpose
--------
-Query Apple school Manager (ABM) for the **assigned server** information of a list of device
-resource IDs.  
-https://developer.apple.com/documentation/appleschoolmanagerapi/get-the-assigned-server-information-for-an-orgdevice
-It follows Apple’s JWT-based OAuth flow documented here:
-https://developer.apple.com/documentation/apple-school-and-business-manager-api/implementing-oauth-for-the-apple-school-and-business-manager-api
 
-Key points
-----------
-1. Generates (or re-uses) a `client_assertion` JWT signed with your EC private key.
-2. Exchanges that assertion for an **access token** (`scope = school.api`).
-3. Calls the **assignedServer** endpoint  
-	`GET /v1/orgDevices/{id}/assignedServer`  
-	which returns server attributes (`serverName`, `serverType`, timestamps).
-4. Writes a CSV (`device_assigned_servers.csv`) containing:
-	device_id, server_id, server_type, serverName, serverType,
-	createdDateTime, updatedDateTime.
-5. Prints a summary of how many look-ups succeeded and how many failed / not found.
-
-Replace the placeholder values below (`Certificate.pem`, client_id, device_ids_file etc.) 
-with your own ABM credentials.
-https://support.apple.com/en-ca/guide/apple-school-manager/axm33189f66a/1/web/1
-Add the serial number list text file path to serialNumberList varibale
-"""
+# Script: getMDMServer_ASM.py
+# Karthikeyan Marappan
+#
+# Purpose
+#
+# Query Apple School Manager (ABM) to fetch the assigned device management service information for a device(https://developer.apple.com/documentation/appleschoolmanagerapi/get-the-assigned-server-information-for-an-orgdevice)
+#
+#It follows Apple’s JWT-based OAuth flow documented here: https://developer.apple.com/documentation/apple-school-and-business-manager-api/implementing-oauth-for-the-apple-school-and-business-manager-api
+#
+#Replace the placeholder values below (`Certificate.pem`, client_id, device_ids_file etc.) with your own ABM credentials. (https://support.apple.com/en-ca/guide/apple-school-manager/axm33189f66a/1/web/1)
+#
+# CLIENT_ASSERTION_VALIDITY_DAYS #Validity of assertion and Apple support max of 180 days
 
 import os
 import json
@@ -51,6 +37,26 @@ scope                 = "school.api"
 serialNumberList      = "serialnumbers.txt" # path of serial number list
 
 # --------------------------------------------------------------------
+# How long (in days) the next JWT should stay valid.
+# Edit this number whenever you want a different lifetime.
+# Apple allows 1 – 180 days.
+# --------------------------------------------------------------------
+
+CLIENT_ASSERTION_VALIDITY_DAYS = 1      # ← change me
+
+# validate and clamp to Apple’s limits
+if CLIENT_ASSERTION_VALIDITY_DAYS > 180:
+        print(f"Requested {CLIENT_ASSERTION_VALIDITY_DAYS} days – "
+                    "Apple allows max 180, so I’ll use 180 instead.")
+        CLIENT_ASSERTION_VALIDITY_DAYS = 180
+elif CLIENT_ASSERTION_VALIDITY_DAYS < 1:
+        print(f"Requested {CLIENT_ASSERTION_VALIDITY_DAYS} days – "
+                    "must be at least 1, so I’ll use 1 instead.")
+        CLIENT_ASSERTION_VALIDITY_DAYS = 1
+    
+    
+    
+# --------------------------------------------------------------------
 # Function to read device IDs from a text file
 # --------------------------------------------------------------------
 def read_device_ids_from_txt(file_path):
@@ -62,22 +68,34 @@ def read_device_ids_from_txt(file_path):
 device_ids = read_device_ids_from_txt(serialNumberList)
 
 # --------------------------------------------------------------------
-# Helper: reuse client_assertion if still valid (> 90 days left)
+# Helper: reuse client_assertion if it is still valid (not expired)
 # --------------------------------------------------------------------
 def load_valid_client_assertion() -> str | None:
+    """
+    Return the cached client_assertion if its exp claim is still in the future.
+    Otherwise return None so that the script can generate a new one.
+    """
     if not os.path.exists(client_assertion_file):
         return None
+    
     try:
         with open(client_assertion_file, "r") as f:
-            data = json.load(f)
-        exp  = int(data.get("exp", 0))
-        now  = int(dt.datetime.utcnow().timestamp())
-        days = (exp - now) // 86400
-        if days > 90:
-            print(f"Using cached client assertion (valid {days} days).")
-            return data["client_assertion"]
-    except Exception:
-        pass
+            cached = json.load(f)
+            
+        exp = int(cached.get("exp", 0))                  # expiry (epoch seconds)
+        now = int(dt.datetime.utcnow().timestamp())      # current time (UTC)
+        
+        # allow 60-second clock-skew safety margin
+        if exp > now + 60:
+            remaining_days = (exp - now) // 86_400
+            print(f"Using cached client assertion "
+                  f"(≈ {remaining_days} days remaining).")
+            return cached["client_assertion"]
+        
+    except Exception as err:
+        # any problem – fall through and create a fresh assertion
+        print(f"Could not reuse cached assertion: {err}")
+        
     return None
 
 # --------------------------------------------------------------------
@@ -85,7 +103,7 @@ def load_valid_client_assertion() -> str | None:
 # --------------------------------------------------------------------
 def generate_client_assertion() -> str:
     issued = int(dt.datetime.utcnow().timestamp())
-    exp    = issued + 86400 * 180                       # 180 days
+    exp    = issued + 86400 * CLIENT_ASSERTION_VALIDITY_DAYS                    
     header = {"alg": jwt_alg, "kid": key_id}
     payload = {
         "sub": client_id,
