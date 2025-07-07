@@ -76,8 +76,8 @@ def load_valid_client_assertion():
     try:
         with open(client_assertion_file, "r") as f:
             cached = json.load(f)
-        exp = int(cached.get("exp", 0))
-        now = int(dt.datetime.utcnow().timestamp())
+        exp = int(cached.get("exp", 0))                  # expiry (epoch seconds)
+        now = int(dt.datetime.utcnow().timestamp())      # current time (UTC)
         if exp > now + 60:
             remaining_days = (exp - now) // 86_400
             print(f"Using cached client assertion (≈ {remaining_days} days remaining).")
@@ -91,7 +91,7 @@ def load_valid_client_assertion():
 # --------------------------------------------------------------------
 def generate_client_assertion():
     issued = int(dt.datetime.utcnow().timestamp())
-    exp = issued + 86400 * CLIENT_ASSERTION_VALIDITY_DAYS
+    exp    = issued + 86400 * CLIENT_ASSERTION_VALIDITY_DAYS            
     header = {"alg": jwt_alg, "kid": key_id}
     payload = {
         "sub": client_id,
