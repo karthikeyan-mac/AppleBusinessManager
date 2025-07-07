@@ -19,7 +19,7 @@ import time
 import uuid
 import requests
 import sys, re
-import csv, datetime
+import csv
 import datetime as dt
 from authlib.jose import jwt
 from Crypto.PublicKey import ECC
@@ -70,8 +70,8 @@ def load_valid_client_assertion():
     try:
         with open(client_assertion_file, "r") as f:
             cached = json.load(f)
-        now = int(dt.datetime.now(dt.timezone.utc).timestamp())
-        exp = int(dt.datetime.now(dt.timezone.utc).timestamp()) + expires_in_seconds
+        exp = int(cached.get("exp", 0))                  # expiry (epoch seconds)
+        now = int(dt.datetime.utcnow().timestamp())      # current time (UTC)
         if exp > now + 60:
             remaining_days = (exp - now) // 86_400
             print(f"Using cached client assertion (≈ {remaining_days} days remaining).")
@@ -84,8 +84,8 @@ def load_valid_client_assertion():
 # Generate new assertion and cache it
 # --------------------------------------------------------------------
 def generate_client_assertion():
-    issued = int(dt.datetime.now(dt.timezone.utc).timestamp())
-    exp = issued + 86400 * CLIENT_ASSERTION_VALIDITY_DAYS
+    issued = int(dt.datetime.utcnow().timestamp())
+    exp    = issued + 86400 * CLIENT_ASSERTION_VALIDITY_DAYS            
     header = {"alg": jwt_alg, "kid": key_id}
     payload = {
         "sub": client_id,
@@ -196,7 +196,7 @@ def download_activity_log(download_url):
     response = requests.get(download_url, allow_redirects=True)
     if response.status_code == 200:
         # Format timestamp
-        timestamp = datetime.datetime.now().strftime("%d%m%y%H%M%S")
+        timestamp = dt.datetime.now().strftime("%d%m%y%H%M%S")
         # Extract filename from Content-Disposition header
         content_disp = response.headers.get("Content-Disposition", "")
         match = re.search(r'filename="(.+?)"', content_disp)
